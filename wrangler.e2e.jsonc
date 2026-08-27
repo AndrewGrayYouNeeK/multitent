@@ -8,11 +8,18 @@
 			"binding": "LOADER"
 		}
 	],
-	"kv_namespaces": [
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "SCRIPT_STORE",
+				"class_name": "ScriptStore"
+			}
+		]
+	},
+	"migrations": [
 		{
-			"binding": "SCRIPTS",
-			"id": "local-scripts",
-			"preview_id": "local-scripts-preview"
+			"tag": "v1",
+			"new_sqlite_classes": ["ScriptStore"]
 		}
 	],
 	"vars": {

@@ -1,3 +1,4 @@
+import { DurableObject } from "cloudflare:workers";
 import { HTML_UI } from "./ui";
 
 const SCRIPT_NAME_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -5,8 +6,37 @@ const RESERVED = new Set(["deploy", "favicon.ico"]);
 
 export interface Env {
 	LOADER: WorkerLoader;
-	SCRIPTS: KVNamespace;
+	SCRIPT_STORE: DurableObjectNamespace<ScriptStore>;
 	READONLY?: string | boolean;
+}
+
+export class ScriptStore extends DurableObject<Env> {
+	private ready = false;
+
+	private ensureTable(): void {
+		if (this.ready) return;
+		this.ctx.storage.sql.exec(
+			"CREATE TABLE IF NOT EXISTS scripts (name TEXT PRIMARY KEY, code TEXT NOT NULL)",
+		);
+		this.ready = true;
+	}
+
+	async putScript(name: string, code: string): Promise<void> {
+		this.ensureTable();
+		this.ctx.storage.sql.exec(
+			"INSERT OR REPLACE INTO scripts (name, code) VALUES (?, ?)",
+			name,
+			code,
+		);
+	}
+
+	async getScript(name: string): Promise<string | null> {
+		this.ensureTable();
+		const row = this.ctx.storage.sql
+			.exec("SELECT code FROM scripts WHERE name = ?", name)
+			.toArray()[0] as { code: string } | undefined;
+		return row?.code ?? null;
+	}
 }
 
 function errorMessage(error: unknown): string {
@@ -16,6 +46,10 @@ function errorMessage(error: unknown): string {
 
 function isReadOnly(env: Env): boolean {
 	return env.READONLY === "true" || env.READONLY === true;
+}
+
+function store(env: Env): DurableObjectStub<ScriptStore> {
+	return env.SCRIPT_STORE.get(env.SCRIPT_STORE.idFromName("default"));
 }
 
 async function deployScript(
@@ -32,7 +66,7 @@ async function deployScript(
 		throw new Error("Worker code must be an ES module with export default");
 	}
 
-	await env.SCRIPTS.put(scriptName, code);
+	await store(env).putScript(scriptName, code);
 	return { script: scriptName };
 }
 
@@ -41,7 +75,7 @@ async function runScript(
 	scriptName: string,
 	request: Request,
 ): Promise<Response> {
-	const code = await env.SCRIPTS.get(scriptName);
+	const code = await store(env).getScript(scriptName);
 	if (!code) {
 		return new Response(`Worker '${scriptName}' not found`, { status: 404 });
 	}
