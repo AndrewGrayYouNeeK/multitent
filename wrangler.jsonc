@@ -4,18 +4,29 @@
 	"main": "./src/index.ts",
 	"compatibility_date": "2025-10-08",
 	"upload_source_maps": true,
-	"dispatch_namespaces": [
-		{
-			"binding": "DISPATCHER",
-			"namespace": "my-dispatch-namespace",
-			"remote": true
-		}
-	],
 	"observability": {
 		"enabled": true
 	},
+	"worker_loaders": [
+		{
+			"binding": "LOADER"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "SCRIPT_STORE",
+				"class_name": "ScriptStore"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["ScriptStore"]
+		}
+	],
 	"vars": {
-		"CLOUDFLARE_ACCOUNT_ID": "Youneekartifacts@gmail.com",
-		"READONLY": "true"
+		"READONLY": "false"
 	}
 }
